@@ -1,4 +1,8 @@
 """
+Bluetooth controller for T-Bot, using Tkinter
+***Currently under development!
+
+Python 3.7 required!
 
 Control Panel>Hardware>Printers>Other Devices>MaximusRoboticus
 Bluetooth>Unique identifier
@@ -13,48 +17,76 @@ Windows 10 Bluetooth Serial Terminal (Microsoft App store)
 https://www.microsoft.com/en-gb/p/bluetooth-serial-terminal/9wzdncrdfst8?activetab=pivot%3Aoverviewtab
 """
 
-import serial # pip install pySerial
-import numpy as np
+# Set TkAgg environment
+import matplotlib
+matplotlib.use('TkAgg')
+#import numpy as np
+import math
 import matplotlib.pyplot as plt
 import tkinter as tk
-#import filedialog
-#from tkinter import messagebox
+import serial # pip install pySerial, only available in python 3.x+
+
+#####################################################################
+#######################  Bluetooth Functions  #######################
+#####################################################################
 
 port = 'COM5' # Device>Services>Serial Port
 baud = 38400 # Get from TBot.ino
-bluetooth = serial.Serial(port,baud)
+try:
+    bluetooth = serial.Serial(port,baud)
+    print('Bluetooth Module started')
+except serial.serialutil.SerialException:
+    print('Bluetooth not available')
+    bluetooth = open('Dan_Bluetooth_test.txt', 'w')
 
 def blueread():
-	try:
-		line = bluetooth.readline().decode().strip().split()
-		print(line)
-	except:
-		print('read didnt''t work')
+    try:
+        line = bluetooth.readline().decode().strip().split()
+        print(line)
+    except:
+        print('read didnt''t work')
         bluetooth.close()
         #sys.exit()
         line = []
-	return line
+    return line
 
 def bluewrite(sendstr):
-	try:
-		bluetooth.write(sendstr.encode(encoding='utf-8'))
-	except:
-		print('send didn''t work')
+    try:
+        bluetooth.write(sendstr.encode(encoding='utf-8'))
+    except:
+        print('send didn''t work')
         bluetooth.close()
         #sys.exit()
 
 def bluejoystick(jx,jy):
-	print('x '+str(jx)+' y '+str(jy))
-	sendstring = chr(0X02)+str(jx)+str(jy)+chr(0X03)
-	print(sendstring)
-	bluewrite(sendstring)
+    print('x '+str(jx)+' y '+str(jy))
+    sendstring = chr(0X02)+str(jx)+str(jy)+chr(0X03)
+    print(sendstring)
+    bluewrite(sendstring)
+
+#####################################################################
+#######################  Interface Functions  #######################
+#####################################################################
 
 # Fonts
-TF= ["Times", 10]
-BF= ["Times", 14]
-SF= ["Times New Roman", 14]
-LF= ["Times", 14]
-HF= ['Courier',12]
+TF= ["Times", 20, 'bold'] # title font
+BF= ["Times", 14] # button font
+SF= ["Times New Roman", 14] # Small font
+LF= ["Times", 14] # large font
+HF= ['Courier',12] # 
+# Colours - background
+bkg = 'snow'
+ety = 'white'
+btn = 'light slate blue'
+opt = 'light slate blue'
+# Colours - active
+btn_active = 'grey'
+opt_active = 'grey'
+# Colours - Fonts
+txtcol = 'black'
+btn_txt = 'black'
+ety_txt = 'black'
+opt_txt = 'black'
 
 
 class TbotGui:
@@ -62,108 +94,199 @@ class TbotGui:
     Simple graphical user interface to send commands to the T-Bot
     """
     def __init__(self,xtl=None):
-        "Initialise"
+        """Initialise"""
         
         # Create Tk inter instance
         self.root = tk.Tk()
         self.root.wm_title('T-Bot Controller by D G Porter')
-        #self.root.minsize(width=640, height=480)
-        self.root.maxsize(width=1920, height=1200)
+        # self.root.minsize(width=640, height=480)
+        self.root.maxsize(width=self.root.winfo_screenwidth(), height=self.root.winfo_screenheight())
+        self.root.tk_setPalette(
+            background=bkg,
+            foreground=txtcol,
+            activeBackground=opt_active,
+            activeForeground=txtcol)
+
+        self.joybox_size = 100
+        self.joystick_size = 60
+        self.pixel_x = self.joybox_size//2
+        self.pixel_y = self.joybox_size//2
+        self.joystick_x = 0.0
+        self.joystick_y = 0.0
         
-        
+        w = tk.Label(self.root, text='T-Bot Controller', bg='red', font=TF)
+        w.pack(expand=tk.YES, fill=tk.X)
+
+        # Line 1
         frame = tk.Frame(self.root)
-        frame.pack(side=tk.LEFT,anchor=tk.N)
-        
-        # Filename (variable)
-        f_file = tk.Frame(frame)
-        f_file.pack(side=tk.TOP,expand=tk.YES,fill=tk.X)
-        self.file = tk.StringVar(frame,self.xtl.filename)
-        var = tk.Label(f_file, text='CIF file:',font=SF,width=10)
-        var.pack(side=tk.LEFT,expand=tk.NO)
-        var = tk.Label(f_file, textvariable=self.file,font=TF,width=50)
-        var.pack(side=tk.LEFT,expand=tk.YES)
-        var = tk.Button(f_file, text='Load CIF',font=BF, command=self.fun_loadcif)
-        var.pack(side=tk.LEFT,expand=tk.NO,padx=5)
-        
-        # Name (variable)
-        f_name = tk.Frame(frame)
-        f_name.pack(side=tk.TOP,expand=tk.YES,fill=tk.X)
-        self.name = tk.StringVar(frame,self.xtl.name)
-        var = tk.Label(f_name, text='Name:',font=SF,width=10)
-        var.pack(side=tk.LEFT)
-        var = tk.Entry(f_name, textvariable=self.name,font=TF, width=40)
-        var.pack(side=tk.LEFT)
-        var.bind('<Return>',self.update_name)
-        var.bind('<KP_Enter>',self.update_name)
-        
-        # Buttons 1
-        f_but = tk.Frame(frame)
-        f_but.pack(side=tk.TOP)
-        var = tk.Button(f_but, text='Lattice\nParameters', font=BF, command=self.fun_latpar)
-        var.pack(side=tk.LEFT)
-        var = tk.Button(f_but, text='Symmetric\nPositions', font=BF, command=self.fun_atoms)
-        var.pack(side=tk.LEFT)
-        var = tk.Button(f_but, text='Symmetry\nOperations', font=BF, command=self.fun_symmetry)
-        var.pack(side=tk.LEFT)
-        var = tk.Button(f_but, text='General\nPositions', font=BF, command=self.fun_structure)
-        var.pack(side=tk.LEFT)
-        
-        # Buttons 2
-        f_but = tk.Frame(frame)
-        f_but.pack(side=tk.TOP)
-        var = tk.Button(f_but, text='Plot\nCrystal', font=BF, command=self.fun_plotxtl)
-        var.pack(side=tk.LEFT)
-        var = tk.Button(f_but, text='Simulate\nStructure Factors', font=BF, command=self.fun_simulate)
-        var.pack(side=tk.LEFT)
+        frame.pack()
+
+        w = tk.Label(frame, text='Port:', font=SF, width=10)
+        w.pack(side=tk.LEFT)
+
+        self.port = tk.StringVar(frame, 'COM5')
+        w = tk.Entry(frame, textvariable=self.port, font=SF, width=20, bg=ety, fg=ety_txt)
+        w.pack(side=tk.LEFT)
+
+        w = tk.Button(frame, text='Connect', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.pack(side=tk.RIGHT)
+
+        # Line 2
+        frame = tk.Frame(self.root)
+        frame.pack()
+
+        w = tk.Label(frame, text='Baud rate:', font=SF, width=10)
+        w.pack(side=tk.LEFT)
+
+        self.baud = tk.IntVar(frame, 38400)
+        w = tk.Entry(frame, textvariable=self.baud, font=SF, width=20, bg=ety, fg=ety_txt)
+        w.pack(side=tk.LEFT)
+
+        w = tk.Button(frame, text='Disconnect', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.pack(side=tk.RIGHT)
+
+        # Joystick
+        frame = tk.Frame(self.root, bg='black')
+        frame.pack(expand=tk.YES, fill=tk.BOTH)
+
+        self.joybox = tk.Canvas(frame, 
+            bg='white', 
+            height=self.joybox_size, 
+            width=self.joybox_size)
+        self.joybox.bind('<B1-Motion>', self.onLeftDrag) 
+        self.joybox.bind('<ButtonPress-1>', self.onLeftClick)
+        self.joybox.bind('<ButtonRelease-1>', self.onLeftRelease)
+        self.joybox.pack(padx=20, pady=20)
+
+        self.joybox.create_oval(
+            self.pixel_x-5, 
+            self.pixel_y-5, 
+            self.pixel_x+5, 
+            self.pixel_y+5, 
+            fill='black')
+        self.stk = self.joybox.create_line(
+            self.pixel_x,
+            self.pixel_y,
+            self.pixel_x,
+            self.pixel_y,
+            fill='black', width=10)
+        """
+        self.joy = self.joybox.create_oval(
+            self.pixel_x-self.joystick_size//2, 
+            self.pixel_y-self.joystick_size//2, 
+            self.pixel_x+self.joystick_size//2, 
+            self.pixel_y+self.joystick_size//2, 
+            fill='slateblue')
+        """
+        pos = self.circle(
+            xpos=self.pixel_x, 
+            ypos=self.pixel_y, 
+            size=self.joystick_size//2)
+        self.joy = self.joybox.create_polygon(pos, fill='slateblue')
+
+        """
+        w = tk.Label(frame, text='Click\'n Drag Here!', bg='white', font=HF)
+        w.config(height=5, width=20)
+        w.bind('<B1-Motion>', self.onLeftDrag) 
+        w.bind('<ButtonPress-1>', self.onLeftClick)
+        w.bind('<ButtonRelease-1>', self.onLeftRelease)
+        w.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH, padx=50, pady=50)
+        """
+        # Start GUI
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.root.mainloop()
     
     ###################################################################################
     ############################## FUNCTIONS ##########################################
     ###################################################################################
-    def fun_set(self):
-        self.file.set(self.xtl.filename)
-        self.name.set(self.xtl.name)
-    
-    def fun_get(self):
-        self.xtl.name = self.name.get()
-    
-    def fun_loadcif(self):
-        #root = Tk().withdraw() # from Tkinter
-        filename = filedialog.askopenfilename(initialdir=os.path.expanduser('~'),\
-        filetypes=[('cif file','.cif'),('magnetic cif','.mcif'),('All files','.*')]) # from tkFileDialog
-        if filename:
-            self.xtl = Crystal(filename)
-            self.fun_set()
-    
-    def update_name(self):
-        newname = self.name.get()
-        self.xtl.name = newname
-    
-    def fun_latpar(self):
-        self.fun_set()
-        Latpargui(self.xtl)
-    
-    def fun_atoms(self):
-        self.fun_set()
-        if np.any(self.xtl.Atoms.mxmymz()):
-            Atomsgui(self.xtl,True,True)
-        else:
-            Atomsgui(self.xtl,True,False)
-    
-    def fun_structure(self):
-        self.fun_set()
-        if np.any(self.xtl.Structure.mxmymz()):
-            Atomsgui(self.xtl,False,True)
-        else:
-            Atomsgui(self.xtl,False,False)
-    
-    def fun_symmetry(self):
-        self.fun_set()
-        Symmetrygui(self.xtl)
-    
-    def fun_plotxtl(self):
-        self.fun_set()
-        self.xtl.Plot.plot_crystal()
-    
-    def fun_simulate(self):
-        self.fun_set()
-        Scatteringgui(self.xtl)
+    def circle(self, xpos=0, ypos=0, size=1.0, flat=1.0, rot=0.0):
+        """
+        Create coordinates of rotated oval 
+        """
+        ang_deg = range(361)
+        ang_rad = [math.radians(ang) for ang in ang_deg]
+        x = [flat*math.sin(ang) for ang in ang_rad]
+        y = [math.cos(ang) for ang in ang_rad]
+        xx = [x[n]*math.cos(rot)-y[n]*math.sin(rot) for n in ang_deg]
+        yy = [x[n]*math.sin(rot)+y[n]*math.cos(rot) for n in ang_deg]
+        out = []
+        for n in ang_deg:
+            out += [xpos+size*xx[n], ypos+size*yy[n]]
+        return out
+
+    def getJoyStick(self, event):
+        w = event.widget
+        xpos = event.x
+        ypos = event.y
+        xmax = w.winfo_width()
+        ymax = w.winfo_height()
+
+        xrat = float(xpos)/xmax - 0.5
+        yrat = float(ypos)/ymax - 0.5
+        dist = (xrat**2 + yrat**2)**0.5
+        angle = math.atan2(yrat, xrat)
+        if dist > 0.25: dist=0.25
+        x = dist*math.cos(angle)
+        y = dist*math.sin(angle)
+
+        self.joystick_x = x*4
+        self.joystick_y = y*4
+        self.pixel_x = int((0.5 + x)*self.joybox_size)
+        self.pixel_y = int((0.5 + y)*self.joybox_size)
+        """
+        if xpos > self.joystick_size//2 and xpos < xmax-self.joystick_size//2:
+            self.pixel_x = xpos
+            self.joystick_x = xrat
+        if ypos > self.joystick_size//2 and ypos < xmax-self.joystick_size//2:
+            self.pixel_y = ypos
+            self.joystick_y = yrat
+        """
+
+    def returnJoyStick(self):
+        self.pixel_x = self.joybox_size//2
+        self.pixel_y = self.joybox_size//2
+        self.joystick_x = 0
+        self.joystick_y = 0
+
+    def joyStickMove(self):
+        joyx = self.joystick_x
+        joyy = self.joystick_y
+        print('Joystick: X=%5.2f Y=%5.2f'%(joyx, joyy))
+
+        dist = 1-0.5*(joyx**2 + joyy**2)**0.5
+        angle = math.atan2(joyy, joyx)
+        pos = self.circle(
+            xpos=self.pixel_x, 
+            ypos=self.pixel_y, 
+            size=self.joystick_size//2, 
+            flat=dist, 
+            rot=angle)
+
+        self.joybox.coords(self.stk,
+            self.joybox_size//2,
+            self.joybox_size//2,
+            self.pixel_x,
+            self.pixel_y)
+        self.joybox.coords(self.joy, pos)
+
+    def onLeftDrag(self, event):
+        self.getJoyStick(event)
+        self.joyStickMove()
+        
+    def onLeftClick(self, event):
+        self.getJoyStick(event)
+        self.joyStickMove()
+
+    def onLeftRelease(self, event):
+        self.returnJoyStick()
+        self.joyStickMove()
+
+    def on_closing(self):
+        """close window"""
+        print('GoodByee!')
+        self.root.destroy()
+        bluetooth.close()
+
+
+if __name__ == '__main__':
+    tbot = TbotGui()
