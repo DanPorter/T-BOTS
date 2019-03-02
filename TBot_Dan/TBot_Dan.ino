@@ -163,7 +163,7 @@ void bluetoothCallBack(){
         if((cmd[i]==ETX) && (i==2 || i==7))   break;     // Button or Joystick data
         i++;
       }
-      if     (i==2)          getButtonState(cmd[1]);    // 3 Bytes  ex: < STX "C" ETX >
+      if(i==2)          getButtonState(cmd[1]);    // 3 Bytes  ex: < STX "C" ETX >
       if(i==7)          getJoystickState(cmd);     // 6 Bytes  ex: < STX "200" "180" ETX >
     }
   }

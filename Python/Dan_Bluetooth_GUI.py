@@ -2,7 +2,10 @@
 Bluetooth controller for T-Bot, using Tkinter
 ***Currently under development!
 
-Python 3.7 required!
+pySerial required
+
+pip install pySerial
+conda install pySerial (tested in python 2.7 and 3.7)
 
 Control Panel>Hardware>Printers>Other Devices>MaximusRoboticus
 Bluetooth>Unique identifier
@@ -18,51 +21,17 @@ https://www.microsoft.com/en-gb/p/bluetooth-serial-terminal/9wzdncrdfst8?activet
 """
 
 # Set TkAgg environment
-import matplotlib
-matplotlib.use('TkAgg')
+#import matplotlib
+#matplotlib.use('TkAgg')
 #import numpy as np
 import math
-import matplotlib.pyplot as plt
-import tkinter as tk
-import serial # pip install pySerial, only available in python 3.x+
-
-#####################################################################
-#######################  Bluetooth Functions  #######################
-#####################################################################
-
-port = 'COM5' # Device>Services>Serial Port
-baud = 38400 # Get from TBot.ino
+#import matplotlib.pyplot as plt
 try:
-    bluetooth = serial.Serial(port,baud)
-    print('Bluetooth Module started')
-except serial.serialutil.SerialException:
-    print('Bluetooth not available')
-    bluetooth = open('Dan_Bluetooth_test.txt', 'w')
+    import Tkinter as tk # python 3+
+except ImportError:
+    import tkinter as tk # python 2
+import serial # pip install pySerial
 
-def blueread():
-    try:
-        line = bluetooth.readline().decode().strip().split()
-        print(line)
-    except:
-        print('read didnt''t work')
-        bluetooth.close()
-        #sys.exit()
-        line = []
-    return line
-
-def bluewrite(sendstr):
-    try:
-        bluetooth.write(sendstr.encode(encoding='utf-8'))
-    except:
-        print('send didn''t work')
-        bluetooth.close()
-        #sys.exit()
-
-def bluejoystick(jx,jy):
-    print('x '+str(jx)+' y '+str(jy))
-    sendstring = chr(0X02)+str(jx)+str(jy)+chr(0X03)
-    print(sendstring)
-    bluewrite(sendstring)
 
 #####################################################################
 #######################  Interface Functions  #######################
@@ -72,7 +41,7 @@ def bluejoystick(jx,jy):
 TF= ["Times", 20, 'bold'] # title font
 BF= ["Times", 14] # button font
 SF= ["Times New Roman", 14] # Small font
-LF= ["Times", 14] # large font
+LF= ["Times", 14, 'bold'] # large font
 HF= ['Courier',12] # 
 # Colours - background
 bkg = 'snow'
@@ -93,9 +62,11 @@ class TbotGui:
     """
     Simple graphical user interface to send commands to the T-Bot
     """
-    def __init__(self,xtl=None):
+    def __init__(self):
         """Initialise"""
         
+        self.bluetooth = None
+
         # Create Tk inter instance
         self.root = tk.Tk()
         self.root.wm_title('T-Bot Controller by D G Porter')
@@ -129,6 +100,7 @@ class TbotGui:
         w.pack(side=tk.LEFT)
 
         w = tk.Button(frame, text='Connect', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.startBluetooth)
         w.pack(side=tk.RIGHT)
 
         # Line 2
@@ -143,12 +115,22 @@ class TbotGui:
         w.pack(side=tk.LEFT)
 
         w = tk.Button(frame, text='Disconnect', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.stopBluetooth)
         w.pack(side=tk.RIGHT)
 
-        # Joystick
+        # Line 3
+        frame = tk.Frame(self.root)
+        frame.pack(expand=tk.YES, fill=tk.X)
+
+        self.notification = tk.StringVar(frame, 'Not Connected')
+        w = tk.Label(frame, textvariable=self.notification, font=LF)
+        w.pack(expand=tk.YES, fill=tk.X)
+
+        # Line 4
         frame = tk.Frame(self.root, bg='black')
         frame.pack(expand=tk.YES, fill=tk.BOTH)
 
+        # Joystick box
         self.joybox = tk.Canvas(frame, 
             bg='white', 
             height=self.joybox_size, 
@@ -156,8 +138,15 @@ class TbotGui:
         self.joybox.bind('<B1-Motion>', self.onLeftDrag) 
         self.joybox.bind('<ButtonPress-1>', self.onLeftClick)
         self.joybox.bind('<ButtonRelease-1>', self.onLeftRelease)
-        self.joybox.pack(padx=20, pady=20)
+        self.joybox.bind('<Up>', self.onUpPress)
+        self.joybox.bind('<Down>', self.onDownPress)
+        self.joybox.bind('<Left>', self.onLeftPress)
+        self.joybox.bind('<Right>', self.onRightPress)
+        #self.joybox.bind('a', self.onUpPress)
+        self.joybox.pack(side=tk.LEFT, padx=20, pady=20)
+        self.joybox.focus_set()
 
+        # Joystick image
         self.joybox.create_oval(
             self.pixel_x-5, 
             self.pixel_y-5, 
@@ -170,28 +159,34 @@ class TbotGui:
             self.pixel_x,
             self.pixel_y,
             fill='black', width=10)
-        """
-        self.joy = self.joybox.create_oval(
-            self.pixel_x-self.joystick_size//2, 
-            self.pixel_y-self.joystick_size//2, 
-            self.pixel_x+self.joystick_size//2, 
-            self.pixel_y+self.joystick_size//2, 
-            fill='slateblue')
-        """
         pos = self.circle(
             xpos=self.pixel_x, 
             ypos=self.pixel_y, 
             size=self.joystick_size//2)
         self.joy = self.joybox.create_polygon(pos, fill='slateblue')
 
-        """
-        w = tk.Label(frame, text='Click\'n Drag Here!', bg='white', font=HF)
-        w.config(height=5, width=20)
-        w.bind('<B1-Motion>', self.onLeftDrag) 
-        w.bind('<ButtonPress-1>', self.onLeftClick)
-        w.bind('<ButtonRelease-1>', self.onLeftRelease)
-        w.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH, padx=50, pady=50)
-        """
+
+        #--- Text box ---
+        frame_box = tk.Frame(frame)
+        frame_box.pack(side=tk.RIGHT, fill=tk.BOTH, expand=tk.YES)
+        
+        # Scrollbars
+        scanx = tk.Scrollbar(frame_box,orient=tk.HORIZONTAL)
+        scanx.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        scany = tk.Scrollbar(frame_box)
+        scany.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Editable string box
+        self.text = tk.Text(frame_box, width=10, height=5, font=HF)
+        self.text.insert(tk.END,'Output will appear here:')
+        self.text.config(wrap=tk.NONE, state=tk.DISABLED)
+        self.text.pack(side=tk.TOP,fill=tk.BOTH, expand=tk.YES)
+        
+        self.text.config(xscrollcommand=scanx.set,yscrollcommand=scany.set)
+        scanx.config(command=self.text.xview)
+        scany.config(command=self.text.yview)
+
         # Start GUI
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
@@ -214,6 +209,74 @@ class TbotGui:
             out += [xpos+size*xx[n], ypos+size*yy[n]]
         return out
 
+    def writeOutput(self, outstring):
+        self.text.config(state=tk.NORMAL)
+        self.text.insert(tk.END,'%s\n'%outstring)
+        self.text.config(state=tk.DISABLED)
+
+    def clearOutput(self):
+        self.text.config(state=tk.NORMAL)
+        self.text.delete(1.0, tk.END)
+        self.text.config(state=tk.DISABLED)
+
+    #####################################################################
+    #######################  Bluetooth Functions  #######################
+    #####################################################################
+
+    def startBluetooth(self):
+        """Connect to Bluetooth Device"""
+
+        if self.bluetooth is not None: 
+            self.bluetooth.close()
+
+        self.notification.set('Connecting...')
+
+        portname = self.port.get()
+        baudrate = self.baud.get()
+        try:
+            self.bluetooth = serial.Serial(portname, baudrate)
+            self.notification.set('Connected')
+        except serial.serialutil.SerialException:
+            self.notification.set('Dan_Bluetooth_text.txt Connected')
+            self.bluetooth = open('Dan_Bluetooth_test.txt', 'w')
+        self.clearOutput()
+
+    def stopBluetooth(self):
+        """Disconnect from Bluetooth Device"""
+        if self.bluetooth is None: return
+        self.bluetooth.close()
+        self.notification.set('Disconnected')
+        self.bluetooth = None
+
+    def readBluetooth(self):
+        try:
+            line = bluetooth.readline().decode().strip().split()
+            self.writeOutput(line)
+        except:
+            self.notification.set('Read didn\'t work')
+            stopBluetooth()
+            line = []
+        return line
+
+    def writeBluetooth(self, sendstr):
+        if self.bluetooth is None: return
+        try:
+            self.bluetooth.write(sendstr.encode(encoding='utf-8'))
+            self.writeOutput(sendstr.encode(encoding='utf-8'))
+            #print('Sent: %s'%sendstr.encode(encoding='utf-8'))
+        except:
+            self.notification.set('Write didn\'t work')
+            stopBluetooth()
+
+    def blueJoystick(self):
+        """Create Joystick string"""
+        # Convert normalised float joystick values to 
+        # integers from 100-300
+        jx = int(self.joystick_x*100 + 200)
+        jy = int(-self.joystick_y*100 + 200)
+        sendstring = chr(0X02)+str(jx)+str(jy)+chr(0X03)
+        self.writeBluetooth(sendstring)
+
     def getJoyStick(self, event):
         w = event.widget
         xpos = event.x
@@ -233,14 +296,6 @@ class TbotGui:
         self.joystick_y = y*4
         self.pixel_x = int((0.5 + x)*self.joybox_size)
         self.pixel_y = int((0.5 + y)*self.joybox_size)
-        """
-        if xpos > self.joystick_size//2 and xpos < xmax-self.joystick_size//2:
-            self.pixel_x = xpos
-            self.joystick_x = xrat
-        if ypos > self.joystick_size//2 and ypos < xmax-self.joystick_size//2:
-            self.pixel_y = ypos
-            self.joystick_y = yrat
-        """
 
     def returnJoyStick(self):
         self.pixel_x = self.joybox_size//2
@@ -251,7 +306,7 @@ class TbotGui:
     def joyStickMove(self):
         joyx = self.joystick_x
         joyy = self.joystick_y
-        print('Joystick: X=%5.2f Y=%5.2f'%(joyx, joyy))
+        #print('Joystick: X=%5.2f Y=%5.2f'%(joyx, joyy))
 
         dist = 1-0.5*(joyx**2 + joyy**2)**0.5
         angle = math.atan2(joyy, joyx)
@@ -267,13 +322,17 @@ class TbotGui:
             self.joybox_size//2,
             self.pixel_x,
             self.pixel_y)
-        self.joybox.coords(self.joy, pos)
+        self.joybox.coords(self.joy, *pos)
+
+        # Send Bluetooth Command:
+        self.blueJoystick()
 
     def onLeftDrag(self, event):
         self.getJoyStick(event)
         self.joyStickMove()
         
     def onLeftClick(self, event):
+        self.joybox.focus_set()
         self.getJoyStick(event)
         self.joyStickMove()
 
@@ -281,11 +340,36 @@ class TbotGui:
         self.returnJoyStick()
         self.joyStickMove()
 
+    def onUpPress(self, event):
+        if self.joystick_y >= -0.5:
+            self.joystick_y -= 0.5
+            self.pixel_y -= int(0.125*self.joybox_size)
+            self.joyStickMove()
+        
+
+    def onDownPress(self, event):
+        if self.joystick_y <= 0.5:
+            self.joystick_y += 0.5
+            self.pixel_y += int(0.125*self.joybox_size)
+            self.joyStickMove()
+
+    def onLeftPress(self, event):
+        if self.joystick_x >= -0.5:
+            self.joystick_x -= 0.5
+            self.pixel_x -= int(0.125*self.joybox_size)
+            self.joyStickMove()
+
+    def onRightPress(self, event):
+        if self.joystick_x <= 0.5:
+            self.joystick_x += 0.5
+            self.pixel_x += int(0.125*self.joybox_size)
+            self.joyStickMove()
+
     def on_closing(self):
         """close window"""
         print('GoodByee!')
         self.root.destroy()
-        bluetooth.close()
+        self.stopBluetooth()
 
 
 if __name__ == '__main__':
