@@ -1,12 +1,32 @@
 """
 Bluetooth controller for T-Bot, using Tkinter
-***Currently under development!
+To run:
+python Dan_Bluetooth_GUI.py 
+ >> window should appear, set the port and baud rate, then press "Connect"
+ >> Use the joystick to move your T-Bot, or arrow keys (focus must be on the joystick)
 
-pySerial required
+Requirements:
+pySerial, Tkinter
 
-pip install pySerial
-conda install pySerial (tested in python 2.7 and 3.7)
+if required:
+    pip install pySerial
+    -or- 
+    conda install pySerial (tested in python 2.7 and 3.7)
 
+Typical port names:
+    Windows:
+        COM4, COM5, ...
+    Linux: 
+
+Typical Baud rates:
+    38400
+
+Version 1.0     03/Feb/2019
+
+By Dan Porter
+2019
+"""
+"""
 Control Panel>Hardware>Printers>Other Devices>MaximusRoboticus
 Bluetooth>Unique identifier
 98:d3:32:21:40:d1
@@ -20,12 +40,7 @@ Windows 10 Bluetooth Serial Terminal (Microsoft App store)
 https://www.microsoft.com/en-gb/p/bluetooth-serial-terminal/9wzdncrdfst8?activetab=pivot%3Aoverviewtab
 """
 
-# Set TkAgg environment
-#import matplotlib
-#matplotlib.use('TkAgg')
-#import numpy as np
 import math
-#import matplotlib.pyplot as plt
 try:
     import Tkinter as tk # python 3+
 except ImportError:
@@ -62,6 +77,12 @@ opt_txt = 'black'
 class TbotGui:
     """
     Simple graphical user interface to send commands to the T-Bot
+
+    1. set the port and baud rate, then press "Connect"
+    2. Use the joystick to move your T-Bot, 
+    3. or arrow keys (focus must be on the joystick)
+    4. Press "Listen" to read a single line from the T-Bot
+    5. When finished, close the connection using "Disconnect"
     """
     def __init__(self):
         """Initialise"""
@@ -252,7 +273,7 @@ class TbotGui:
             self.bluetooth.close()
 
         self.notification.set('Connecting...')
-        
+
         portname = self.port.get()
         baudrate = self.baud.get()
         try:
