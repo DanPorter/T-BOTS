@@ -124,7 +124,11 @@ class TbotGui:
 
         self.notification = tk.StringVar(frame, 'Not Connected')
         w = tk.Label(frame, textvariable=self.notification, font=LF)
-        w.pack(expand=tk.YES, fill=tk.X)
+        w.pack(side=tk.LEFT, expand=tk.YES)
+
+        w = tk.Button(frame, text='Listen', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.readBluetooth)
+        w.pack(side=tk.RIGHT)
 
         # Line 4
         frame = tk.Frame(self.root, bg='black')
@@ -234,12 +238,14 @@ class TbotGui:
         portname = self.port.get()
         baudrate = self.baud.get()
         try:
-            self.bluetooth = serial.Serial(portname, baudrate)
+            self.bluetooth = serial.Serial(portname, baudrate, timeout=2.0, write_timeout=2.0)
             self.notification.set('Connected')
         except serial.serialutil.SerialException:
             self.notification.set('Dan_Bluetooth_text.txt Connected')
-            self.bluetooth = open('Dan_Bluetooth_test.txt', 'w')
+            self.bluetooth = open('Dan_Bluetooth_test.txt', 'w+b')
         self.clearOutput()
+        # Test connection
+        self.writeBluetooth('Connected...')
 
     def stopBluetooth(self):
         """Disconnect from Bluetooth Device"""
@@ -249,12 +255,19 @@ class TbotGui:
         self.bluetooth = None
 
     def readBluetooth(self):
-        try:
-            line = bluetooth.readline().decode().strip().split()
+        if self.bluetooth is None: return
+        #try:
+        #line = bluetooth.readline().decode().strip().split()
+        line = self.bluetooth.readline().decode().strip()
+        if len(line) > 0:
             self.writeOutput(line)
+        else:
+            self.writeOutput('Empty')
+        try:
+            pass
         except:
             self.notification.set('Read didn\'t work')
-            stopBluetooth()
+            self.stopBluetooth()
             line = []
         return line
 
@@ -265,8 +278,8 @@ class TbotGui:
             self.writeOutput(sendstr.encode(encoding='utf-8'))
             #print('Sent: %s'%sendstr.encode(encoding='utf-8'))
         except:
-            self.notification.set('Write didn\'t work')
-            stopBluetooth()
+            self.writeOutput('Write didn\'t work')
+            self.stopBluetooth()
 
     def blueJoystick(self):
         """Create Joystick string"""
