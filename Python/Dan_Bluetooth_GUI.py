@@ -31,6 +31,7 @@ try:
 except ImportError:
     import tkinter as tk # python 2
 import serial # pip install pySerial
+from serial.tools import list_ports
 
 
 #####################################################################
@@ -66,6 +67,9 @@ class TbotGui:
         """Initialise"""
         
         self.bluetooth = None
+        # Ports
+        ports = list_ports.comports()
+        portlist = [p.device for p in ports]
 
         # Create Tk inter instance
         self.root = tk.Tk()
@@ -95,8 +99,16 @@ class TbotGui:
         w = tk.Label(frame, text='Port:', font=SF, width=10)
         w.pack(side=tk.LEFT)
 
-        self.port = tk.StringVar(frame, 'COM5')
-        w = tk.Entry(frame, textvariable=self.port, font=SF, width=20, bg=ety, fg=ety_txt)
+        self.port = tk.StringVar(frame, portlist[0])
+        w = tk.Entry(frame, textvariable=self.port, font=SF, width=10, bg=ety, fg=ety_txt)
+        w.bind('<Return>',self.startBluetooth)
+        w.bind('<KP_Enter>',self.startBluetooth)
+        w.pack(side=tk.LEFT)
+
+        self.portname = tk.StringVar(frame, portlist[0])
+        w = tk.OptionMenu(frame, self.portname, *portlist, command=self.portOption)
+        w.config(font=SF, width=5, bg=opt, activebackground=opt_active)
+        w["menu"].config(bg=opt, bd=0, activebackground=opt_active)
         w.pack(side=tk.LEFT)
 
         w = tk.Button(frame, text='Connect', font=BF, width=10, bg=btn, fg=btn_txt)
@@ -112,6 +124,8 @@ class TbotGui:
 
         self.baud = tk.IntVar(frame, 38400)
         w = tk.Entry(frame, textvariable=self.baud, font=SF, width=20, bg=ety, fg=ety_txt)
+        w.bind('<Return>',self.startBluetooth)
+        w.bind('<KP_Enter>',self.startBluetooth)
         w.pack(side=tk.LEFT)
 
         w = tk.Button(frame, text='Disconnect', font=BF, width=10, bg=btn, fg=btn_txt)
@@ -223,18 +237,22 @@ class TbotGui:
         self.text.delete(1.0, tk.END)
         self.text.config(state=tk.DISABLED)
 
+    def portOption(self, event=None):
+        portname=self.portname.get()
+        self.port.set(portname)
+
     #####################################################################
     #######################  Bluetooth Functions  #######################
     #####################################################################
 
-    def startBluetooth(self):
+    def startBluetooth(self, event=None):
         """Connect to Bluetooth Device"""
 
         if self.bluetooth is not None: 
             self.bluetooth.close()
 
         self.notification.set('Connecting...')
-
+        
         portname = self.port.get()
         baudrate = self.baud.get()
         try:

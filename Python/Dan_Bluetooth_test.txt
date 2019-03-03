@@ -1,5 +1,1 @@
-Connected... --
-223200223203223207223219223223223226223230223234223242223246223250223253223261200200ld be
-230207200200e command "package require msgcat".
-#
-# Copyright (c) 1998-2000 by Ajuba Solutions.
+Connected...
