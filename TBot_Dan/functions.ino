@@ -141,7 +141,27 @@ void getButtonState(int bStatus)  {
       gtrim -= 0.05;
       break;
 
+// -----------------  BUTTON #7  -----------------------
+    case 'M':
+      BTSerial.print((char)STX);
+      BTSerial.print("HelloThere");
+      BTSerial.print((char)ETX);
+     break;
+    case 'N':
+      BTSerial.print((char)STX);
+      BTSerial.print(fping);
+      BTSerial.print((char)0x20);
+      BTSerial.print(pingval);
+      BTSerial.print((char)0x20);
+      BTSerial.print(KPS_last);
+      BTSerial.print((char)0x20);
+      BTSerial.print(KP_last);
+      BTSerial.print((char)0x20);
+      BTSerial.print(KI_last);
+      BTSerial.print((char)0x20);
+      BTSerial.print(gtrim);
+      BTSerial.print((char)0x0A); // Newline
+      //BTSerial.print((char)ETX);
+      break;
 }
 }
-
-

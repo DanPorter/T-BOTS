@@ -113,6 +113,10 @@ class TbotGui:
         w = tk.Label(self.root, text='T-Bot Controller', bg='red', font=TF)
         w.pack(expand=tk.YES, fill=tk.X)
 
+        self.notification = tk.StringVar(self.root, 'Not Connected')
+        w = tk.Label(self.root, textvariable=self.notification, bg='light blue', font=LF)
+        w.pack(expand=tk.YES, fill=tk.X)
+
         # Line 1
         frame = tk.Frame(self.root)
         frame.pack()
@@ -157,13 +161,23 @@ class TbotGui:
         frame = tk.Frame(self.root)
         frame.pack(expand=tk.YES, fill=tk.X)
 
-        self.notification = tk.StringVar(frame, 'Not Connected')
-        w = tk.Label(frame, textvariable=self.notification, font=LF)
-        w.pack(side=tk.LEFT, expand=tk.YES)
+        w = tk.Button(frame, text='Write', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.writeLine)
+        w.pack(side=tk.LEFT)
 
-        w = tk.Button(frame, text='Listen', font=BF, width=10, bg=btn, fg=btn_txt)
+        self.write = tk.StringVar(frame, '300200')
+        w = tk.Entry(frame, textvariable=self.write, font=SF, width=10, bg=ety, fg=ety_txt)
+        w.bind('<Return>',self.writeLine)
+        w.bind('<KP_Enter>',self.writeLine)
+        w.pack(side=tk.LEFT)
+
+        w = tk.Button(frame, text='Read', width=8, font=BF, bg=btn, fg=btn_txt)
         w.config(command=self.readBluetooth)
-        w.pack(side=tk.RIGHT)
+        w.pack(side=tk.LEFT)
+
+        w = tk.Button(frame, text='Program', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.program)
+        w.pack(side=tk.LEFT)
 
         # Line 4
         frame = tk.Frame(self.root, bg='black')
@@ -252,6 +266,7 @@ class TbotGui:
         self.text.config(state=tk.NORMAL)
         self.text.insert(tk.END,'%s\n'%outstring)
         self.text.config(state=tk.DISABLED)
+        self.text.see(tk.END)
 
     def clearOutput(self):
         self.text.config(state=tk.NORMAL)
@@ -261,6 +276,15 @@ class TbotGui:
     def portOption(self, event=None):
         portname=self.portname.get()
         self.port.set(portname)
+
+    def program(self):
+        ProgramGui(self)
+
+    def writeLine(self, event=None):
+        line = self.write.get()
+        line = '\x02'+line+'\x03'
+        print('%r == %s'%(line,line))
+        self.writeBluetooth(line)
 
     #####################################################################
     #######################  Bluetooth Functions  #######################
@@ -277,11 +301,14 @@ class TbotGui:
         portname = self.port.get()
         baudrate = self.baud.get()
         try:
-            self.bluetooth = serial.Serial(portname, baudrate, timeout=2.0, write_timeout=2.0)
+            self.bluetooth = serial.Serial(portname, baudrate, timeout=0.1, write_timeout=0.1)
             self.notification.set('Connected')
         except serial.serialutil.SerialException:
-            self.notification.set('Dan_Bluetooth_text.txt Connected')
-            self.bluetooth = open('Dan_Bluetooth_test.txt', 'w+b')
+        	self.bluetooth = None
+        	self.notification.set('Can\'t Connect')
+        	return
+            #self.notification.set('Dan_Bluetooth_text.txt Connected')
+            #self.bluetooth = open('Dan_Bluetooth_test.txt', 'w+b')
         self.clearOutput()
         # Test connection
         self.writeBluetooth('Connected...')
@@ -313,8 +340,8 @@ class TbotGui:
     def writeBluetooth(self, sendstr):
         if self.bluetooth is None: return
         try:
-            self.bluetooth.write(sendstr.encode(encoding='utf-8'))
-            self.writeOutput(sendstr.encode(encoding='utf-8'))
+            self.bluetooth.write(sendstr.encode('ascii', 'ignore'))
+            self.writeOutput(sendstr.encode('ascii', 'ignore'))
             #print('Sent: %s'%sendstr.encode(encoding='utf-8'))
         except:
             self.writeOutput('Write didn\'t work')
@@ -398,7 +425,6 @@ class TbotGui:
             self.pixel_y -= int(0.125*self.joybox_size)
             self.joyStickMove()
         
-
     def onDownPress(self, event):
         if self.joystick_y <= 0.5:
             self.joystick_y += 0.5
@@ -423,6 +449,123 @@ class TbotGui:
         self.root.destroy()
         self.stopBluetooth()
 
+
+class ProgramGui:
+    """
+    Programming GUI
+    """
+    def __init__(self, parent):
+        """Initialise"""
+        
+        self.parent = parent
+
+        # Create Tk inter instance
+        self.root = tk.Tk()
+        self.root.wm_title('T-Bot Programmer by D G Porter')
+        # self.root.minsize(width=640, height=480)
+        self.root.maxsize(width=self.root.winfo_screenwidth(), height=self.root.winfo_screenheight())
+        self.root.tk_setPalette(
+            background=bkg,
+            foreground=txtcol,
+            activeBackground=opt_active,
+            activeForeground=txtcol)
+
+        frame = tk.Frame(self.root)
+        frame.pack(fill=tk.BOTH, expand=tk.YES)
+
+        # ---Command Box---
+        fbox = tk.Frame(frame)
+        fbox.pack(side=tk.LEFT, fill=tk.Y, expand=tk.YES)
+        
+        scl_scanx = tk.Scrollbar(fbox,orient=tk.HORIZONTAL)
+        scl_scanx.pack(side=tk.BOTTOM, fill=tk.BOTH)
+        
+        scl_scany = tk.Scrollbar(fbox)
+        scl_scany.pack(side=tk.RIGHT, fill=tk.BOTH)
+        
+        self.lst_scan = tk.Listbox(fbox, font=HF, selectmode=tk.SINGLE, width=30, height=10,
+                                xscrollcommand=scl_scanx.set,yscrollcommand=scl_scany.set)
+        self.lst_scan.configure(exportselection=False)
+        
+        # Populate list box
+        self.lst_scan.insert(tk.END, '# Add Commands here') 
+        
+        self.lst_scan.pack(side=tk.LEFT,fill=tk.BOTH,expand=tk.YES)
+        self.lst_scan.select_set(0)
+        #self.lst_scan.bind("<<ListboxSelect>>", self.f_scan_select)
+        #print( self.lst_scan.curselection()[0] )
+        
+        scl_scanx.config(command=self.lst_scan.xview)
+        scl_scany.config(command=self.lst_scan.yview)
+        
+        #self.txt_scan.config(xscrollcommand=scl_scanx.set,yscrollcommand=scl_scany.set)
+
+        # ---Command Buttons---
+        fcmd = tk.Frame(frame)
+        fcmd.pack(side=tk.RIGHT, fill=tk.X, expand=tk.YES)
+
+        w = tk.Button(fcmd, text='Forwards', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_forwards)
+        w.pack()
+        w = tk.Button(fcmd, text='Backwards', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_backwards)
+        w.pack()
+        w = tk.Button(fcmd, text='Left', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_left)
+        w.pack()
+        w = tk.Button(fcmd, text='Right', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_right)
+        w.pack()
+
+        self.write = tk.StringVar(fcmd, '300200')
+        w = tk.Entry(fcmd, textvariable=self.write, font=SF, width=10, bg=ety, fg=ety_txt)
+        w.bind('<Return>',self.but_write)
+        w.bind('<KP_Enter>',self.but_write)
+        w.pack()
+
+        w = tk.Button(fcmd, text='Write', width=10, font=BF, bg=btn, fg=btn_txt)
+        w.config(command=self.but_write)
+        w.pack()
+
+        w = tk.Button(fcmd, text='Speak', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_speak)
+        w.pack()
+
+        w = tk.Button(fcmd, text='Delete', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_delete)
+        w.pack()
+
+        w = tk.Button(fcmd, text='RUN', font=BF, width=10, bg=btn, fg=btn_txt)
+        w.config(command=self.but_run)
+        w.pack()
+
+    ########################## Functions ##############################
+    def but_forwards(self):
+        self.lst_scan.insert(tk.END, 'FORWARDS')
+
+    def but_backwards(self):
+        self.lst_scan.insert(tk.END, 'BACKWARDS')
+
+    def but_left(self):
+        self.lst_scan.insert(tk.END, 'LEFT')
+
+    def but_right(self):
+        self.lst_scan.insert(tk.END, 'RIGHT')
+
+    def but_write(self, event=None):
+        txt = self.write.get()
+        self.lst_scan.insert(tk.END, 'WRITE(%s)'%txt)
+
+    def but_speak(self):
+        self.lst_scan.insert(tk.END, 'SPEAK')
+
+    def but_delete(self):
+        selection = self.lst_scan.curselection()
+        for sel in selection:
+            self.lst_scan.delete(sel, sel)
+
+    def but_run(self):
+        pass
 
 if __name__ == '__main__':
     tbot = TbotGui()

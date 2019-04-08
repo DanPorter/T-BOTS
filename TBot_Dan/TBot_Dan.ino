@@ -58,7 +58,7 @@ float gtrim_step = 0.02; // shift in gtrim in auto-tune
 
 ////////////////////  Speed and Stability tunings   /////////////////////////
 
-float gtrim = 3.5; // 16.0 for Titus, 3.5 for Maximus  // Compensated for drift in forward or reverse direction.
+float gtrim = 13.5; // 16.0 for Titus, 3.5 for Maximus  // Compensated for drift in forward or reverse direction.
 float gtrim_ini = gtrim; // reset value 
 
 float rtrim = 0.0; // Compensated for rotational drift.
@@ -162,6 +162,9 @@ void bluetoothCallBack(){
         if(cmd[i]>127 || i>7)                 break;     // Communication error
         if((cmd[i]==ETX) && (i==2 || i==7))   break;     // Button or Joystick data
         i++;
+      }
+      for (int n=0; n<i; n++) { 
+        // BTSerial.print((char)cmd[n]);
       }
       if(i==2)          getButtonState(cmd[1]);    // 3 Bytes  ex: < STX "C" ETX >
       if(i==7)          getJoystickState(cmd);     // 6 Bytes  ex: < STX "200" "180" ETX >
